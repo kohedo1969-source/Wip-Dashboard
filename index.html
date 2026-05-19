@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Work in Progress: Faire Chancen in Ausbildung und Beruf</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root { --primary: #2c3e50; --secondary: #18bc9c; --warning: #f39c12; --danger: #e74c3c; --light: #ecf0f1; --dark: #34495e; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f7; color: var(--dark); margin: 0; padding: 0; }
+        header { background-color: var(--primary); color: white; padding: 20px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .container { max-width: 1000px; margin: 30px auto; padding: 0 20px; }
+        
+        /* Steuerungs-Buttons */
+        .controls-container { display: flex; gap: 15px; margin-bottom: 20px; justify-content: center; }
+        .control-btn { background-color: white; border: 1px solid #bdc3c7; color: var(--dark); padding: 10px 15px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .control-btn:hover { border-color: var(--primary); background-color: #fdfefe; }
+        
+        .progress-container { background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 30px; text-align: center; }
+        .progress-bar-bg { background-color: var(--light); border-radius: 20px; height: 25px; width: 100%; margin-top: 10px; overflow: hidden; }
+        .progress-bar { background-color: var(--secondary); height: 100%; width: 0%; transition: width 0.3s ease-in-out; }
+        .year-section { margin-bottom: 40px; }
+        .year-title { font-size: 24px; border-bottom: 3px solid var(--primary); padding-bottom: 5px; color: var(--primary); margin-top: 20px;}
+        
+        .month-card { background-color: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border-left: 5px solid var(--primary); }
+        .month-title { font-size: 18px; margin-top: 0; color: var(--dark); display: flex; justify-content: space-between; align-items: center; }
+        .print-month-btn { background: transparent; border: none; font-size: 18px; cursor: pointer; opacity: 0.5; transition: opacity 0.2s; }
+        .print-month-btn:hover { opacity: 1; }
+        
+        .todo-list { list-style: none; padding: 0; margin: 0; }
+        .todo-item { display: flex; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--light); }
+        .todo-item:last-child { border-bottom: none; }
+        .todo-item input[type="checkbox"] { margin-right: 15px; margin-top: 4px; transform: scale(1.3); cursor: pointer; }
+        .todo-text { flex-grow: 1; font-size: 15px; line-height: 1.4; padding-right: 15px; }
+        
+        /* Action-Buttons (Stift & Papierkorb) */
+        .action-btn { background: transparent; border: none; font-size: 14px; cursor: pointer; opacity: 0.4; transition: opacity 0.2s; margin-right: 4px; padding: 2px; }
+        .action-btn:hover { opacity: 1; }
+
+        /* Zuständigkeits-Auswahl Styling */
+        .assign-select { margin-left: auto; margin-top: 2px; padding: 4px 8px; border-radius: 4px; border: 1px solid #bdc3c7; font-size: 13px; background-color: #fff; color: var(--dark); cursor: pointer; }
+        .assign-select:hover { border-color: var(--primary); }
+
+        /* Visuelles Feedback: Durchstreichen */
+        input[type="checkbox"]:checked ~ .todo-text, .todo-item.checked .todo-text { text-decoration: line-through !important; color: #95a5a6 !important; }
+        
+        .badge { font-size: 11px; padding: 3px 8px; border-radius: 4px; font-weight: bold; color: white; margin-left: 5px; display: inline-block; }
+        .badge-budget { background-color: var(--warning); }
+        .badge-logistik { background-color: #3498db; }
+        .badge-milestone { background-color: var(--danger); }
+        
+        .add-btn { background-color: transparent; border: 2px dashed #bdc3c7; color: #7f8c8d; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; margin-top: 15px; width: 100%; transition: all 0.2s; }
+        .add-btn:hover { border-color: var(--secondary); color: var(--secondary); background-color: #f0fdfa; }
+
+        /* Erledigte ausblenden - 100% Sicherer CSS Pfad */
+        body.hide-completed .todo-item.checked { display: none !important; }
+        body.hide-completed .todo-item:has(input[type="checkbox"]:checked) { display: none !important; }
+
+        /* Print-Styles */
+        @media print {
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            body { background-color: white; }
+            .controls-container, .add-btn, .print-month-btn, .action-btn { display: none !important; }
+            .month-card { box-shadow: none; border: 1px solid #bdc3c7; border-left: 5px solid var(--primary); break-inside: avoid; margin-bottom: 30px; }
+            .year-title { page-break-after: avoid; }
+            .assign-select { border: none; background: transparent; appearance: none; -webkit-appearance: none; font-weight: bold; font-size: 14px; text-align: right; }
+            body.print-single .month-card:not(.print-active) { display: none !important; }
+            body.print-single .year-section:not(:has(.print-active)) { display: none !important; }
+            body.print-single .progress-container { display: none !important; }
+            body.print-single .year-title { border: none; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Work in Progress</h1>
+    <p>Faire Chancen in Ausbildung und Beruf | RAA Berlin</p>
+</header>
+
+<div class="container">
+    
+    <div class="controls-container">
+        <button class="control-btn" id="toggle-completed-btn" onclick="toggleCompleted()">👁️ Erledigte Aufgaben ausblenden</button>
+        <button class="control-btn" onclick="window.print()">🖨️ Gesamtprojekt drucken</button>
+    </div>
+
+    <div class="progress-container">
+        <h2>Gesamtprojekt-Fortschritt</h2>
+        <div id="progress-text">Lade aktuellen Projektstatus...</div>
+        <div class="progress-bar-bg"><div class="progress-bar" id="project-progress"></div></div>
+    </div>
+
+    <div class="year-section">
+        <div class="year-title">Haushaltsjahr 2026</div>
+        
+        <div class="month-card" id="card-m1">
+            <div class="month-title">
+                <span>Mai 2026 (Monat 1) - Projektstart & Vorbereitung</span>
+                <button class="print-month-btn" onclick="printMonth('card-m1')" title="Diesen Monat drucken">🖨️</button>
+            </div>
+            <ul class="todo-list" id="list-m1">
+                <li class="todo-item"><input type="checkbox" id="t1"><span class="todo-text">Finanzplan (3-tägige Sitzungen, 12 TN, Filme, Bundesreisekostengesetz) finalisieren und gezeichnet beim BMAS einreichen</span></li>
+                <li class="todo-item"><input type="checkbox" id="t2"><span class="todo-text">Stellenausschreibungen für das Projektteam (Projektleitung 1,0 VZA, Fachreferat 1,0 VZA, Assistenz 0,5 VZA) vorbereiten & veröffentlichen</span></li>
+                <li class="todo-item"><input type="checkbox" id="t3"><span class="todo-text">Kooperationsverträge mit den 2 Partnerunternehmen (Privatwirtschaft & öffentlicher Raum) und der AGMJ rechtlich prüfen</span></li>
+                <li class="todo-item"><input type="checkbox" id="t4"><span class="todo-text">Erste Logistik-Recherche für Unterkünfte und Tagungsräume in Berlin nach BRKG-Kriterien für die Jugendlichen starten</span></li>
+            </ul>
+            <button class="add-btn" onclick="addCustomTask('list-m1')">➕ Neue Aufgabe hinzufügen</button>
+        </div>
+
+        <div class="month-card" id="card-m2">
+            <div class="month-title">
+                <span>Juni 2026 (Monat 2) - Personaleinstellung & Technik</span>
+                <button class="print-month-btn" onclick="printMonth('card-m2')" title="Diesen Monat drucken">🖨️</button>
+            </div>
+            <ul class="todo-list" id="list-m2">
+                <li class="todo-item"><input type="checkbox" id="t5"><span class="todo-text">Arbeitsverträge mit dem Projektteam schließen und die Einarbeitung in RAA-Strukturen und AMR-Thematik starten</span></li>
+                <li class="todo-item"><input type="checkbox" id="t6"><span class="todo-text">Unterzeichnung aller formellen Kooperationsvereinbarungen mit den Partnerunternehmen und der AGMJ</span></li>
+                <li class="todo-item"><input type="checkbox" id="t7"><span class="todo-text">Onboarding & Briefing der Fachkraft für Videodokumentation (Dokumentationsraster & Interviewleitfaden erstellen) <span class="badge badge-budget">Honorare</span></span></li>
+                <li class="todo-item"><input type="checkbox" id="t8"><span class="todo-text">Technische Beschaffung: Dediziertes Projekt-Smartphone, Gimbal und Laptop kaufen <span class="badge badge-budget">F0850 Investition</span></span></li>
+                <li class="todo-item"><input type="checkbox" id="t9"><span class="todo-text">Curriculare Feinplanung für die inhaltlichen Workshop-Module mit Expert:innen starten</span></li>
+            </ul>
+            <button class="add-btn" onclick="addCustomTask('list-m2')">➕ Neue Aufgabe hinzufügen</button>
+        </div>
+
+        <div class="month-card" id="card-m3">
+            <div class="month-title">
+                <span>Juli 2026 (Monat 3) - Rekrutierung & Buchungslogistik</span>
+                <button class="print-month-btn" onclick="printMonth('card-m3')" title="Diesen Monat drucken">🖨️</button>
+            </div>
+            <ul class="todo-list" id="list-m3">
+                <li class="todo-item"><input type="checkbox" id="t10"><span class="todo-text">Ausschreibung & Auswahl von exakt 12 jugendlichen Multiplikator:innen über die AGMJ-Jugendverbände <span class="badge badge-logistik">12 TN bundesweit</span></span></li>
+                <li class="todo-item"><input type="checkbox" id="t11"><span class="todo-text">Verbindliche Buchung der Unterkünfte und Seminarräume in Berlin (3 Tage Laufzeit für Arbeitssitzungen beachten!) <span class="badge badge-logistik">3 Tage Logistik</span></span></li>
+                <li class="todo-item"><input type="checkbox" id="t12"><span class="todo-text">Infoblatt zur Reisekostenabrechnung nach Bundesreisekostengesetz (BRKG) für die Jugendlichen fertigstellen <span class="badge badge-logistik">BRKG</span></span></li>
+                <li class="todo-item"><input type="checkbox" id="t13"><span class="todo-text">Erstellung des Social-Media-Redaktionsplans für die „Know-Your-Rights“-Kampagne</span></li>
+            </ul>
+            <button class="add-btn" onclick="addCustomTask('list-m3')">➕ Neue Aufgabe hinzufügen</button>
+        </div>
+
+        <div class="month-card" id="card-m4">
+            <div class="month-title">
+                <span>August 2026 (Monat 4) - Start Praxisphase / Arbeitssitzung 1</span>
+                <button class="print-month-btn" onclick="printMonth('card-m4')" title="Diesen Monat drucken">🖨️</button>
+            </div>
+            <ul class="todo-list" id="list-m4">
+                <li class="todo-item"><input type="checkbox" id="t14"><span class="todo-text">Durchführung <b>Arbeitssitzung 1 (Jugendliche)</b>: 3 Tage in Berlin zur Qualifizierung, Empowerment und Vorbereitung als Impulsgeber:innen</span></li>
+                <li class="todo-item"><input type="checkbox" id="t15"><span class="todo-text">Start der kontinuierlichen Filmbegleitung und Durchführung der ersten Baseline-Interviews mit den Jugendlichen</span></li>
+                <li class="todo-item"><input type="checkbox" id="t16"><span class="todo-text">Struktur-Check starten: Fachliche Prüfung der Regelwerke und Recruiting-Prozesse der zwei Partnerunternehmen</span></li>
+            </ul>
+            <button class="add-btn" onclick="addCustomTask('list-m4')">➕ Neue Aufgabe hinzufügen</button>
+        </div>
+
+        <div class="month-card" id="card-m5">
+            <div class="month-title">
+                <span>September 2026 (Monat 5) - Arbeitssitzung 2 & Unternehmensbriefing</span>
+                <button class="print-month-btn" onclick="printMonth('card-m5')" title="Diesen Monat drucken">🖨️</button>
+            </div>
+            <ul class="todo-list" id="list-m5">
+                <li class="todo-item"><input type="checkbox" id="t17"><span class="todo-text">Durchführung <b>Arbeitssitzung 2 (Jugendliche)</b>: 3 Tage in Berlin zur konkreten Erarbeitung von Forderungs- und Handlungskatalogen</span></li>
+                <li class="todo-item"><input type="checkbox" id="t18"><span class="todo-text">Reisekosten der Jugendlichen aus dem August-Workshop nach BRKG vollständig prüfen & abrechnen</span></li>
+                <li class="todo-item"><input type="checkbox" id="t19"><span class="todo-text">Digitale Vorbesprechung und detailliertes Briefing mit dem ersten Partnerunternehmen (Privatwirtschaft) für das Real-Labor</span></li>
+            </ul>
+            <button class="add-btn" onclick="addCustomTask('list-m5')">➕ Neue Aufgabe hinzufügen</button>
+        </div>
+
+        <div class="month-card" id="card-m6">
+            <div class="month-title">
+                <span>Oktober 2026 (Monat 6) - Real-Labor 1</span>
+                <button class="print-month-btn" onclick="printMonth('card-m6')" title="Diesen Monat drucken">🖨️</button>
+            </div>
+            <ul class="todo-list" id="list-m6">
+                <li class="todo-item"><input type="checkbox" id="t20"><span class="todo-text">Durchführung <b>Real-Labor 1</b>: 2-tägige moderierte Dialogveranstaltung direkt vor Ort im ersten Partnerunternehmen <span class="badge badge-milestone">Meilenstein</span></span></li>
+                <li class="todo-item"><input type="checkbox" id="t21"><span class="todo-text">Filmische Dokumentation des Real-Labors 1 vor Ort inklusive Interviews mit HR-Verantwortlichen und Führungskräften</span></li>
+                <li class="todo-item"><input type="checkbox" id="t22"><span class="todo-text">Ergebnisse des ersten Struktur-Checks mit den im Real-Labor entwickelten Praxis-Ansätzen abgleichen</span></li>
+            </ul>
+            <button class="add-btn" onclick="addCustomTask('list-m6')">➕ Neue Aufgabe hinzufügen</button>
+        </div>
+
+        <div class="month-card" id="card-m7">
+            <div class="month-title">
+                <span>November 2026 (Monat 7) - Reflexion & Zweiter Partner</span>
+                <button class="print-month-btn" onclick="printMonth('card-m7')" title="Diesen Monat drucken">🖨️</button>
+            </div>
+            <ul class="todo-list" id="list-m7">
+                <li class="todo-item"><input type="checkbox" id="t23"><span class="todo-text">Durchführung <b>Arbeitssitzung 3 (Jugendliche)</b>: 3 Tage in Berlin zur vertiefenden Reflexion von Real-Labor 1 und Vorbereitung auf Partner 2</span></li>
+                <li class="todo-item"><input type="checkbox" id="t24"><span class="todo-text">Erster großer Zwischenschnitt des Videomaterials und gemeinsame Sichtung mit der Fachkraft für Videodokumentation</span></li>
+                <li class="todo-item"><input type="checkbox" id="t25"><span class="todo-text">Prozessuales Vorbereitungsgespräch und Briefing mit dem zweiten Partnerunternehmen (Öffentlicher Dienst / urbaner Raum)</span></li>
+            </ul>
+            <button class="add-btn" onclick="addCustomTask('list-m7')">➕ Neue Aufgabe hinzufügen</button>
+        </div>
+
+        <div class="month-card" id="card-m8">
+            <div class="month-title">
+                <span>Dezember 2026 (Monat 8) - Jahresabschluss 2026</span>
+                <button class="print-month-btn" onclick="printMonth('card-m8')" title="Diesen Monat drucken">🖨️</button>
+            </div>
+            <ul class="todo-list" id="list-m8">
+                <li class="todo-item"><input type="checkbox" id="t26"><span class="todo-text">Durchführung <b>Arbeitssitzung 1 (Unternehmen)</b>: Gezielter Sensibilisierungs- und Vorbereitungsworkshop für das zweite Partnerunternehmen</span></li>
+                <li class="todo-item"><input type="checkbox" id="t27"><span class="todo-text">Schnitt und Fertigstellung der ersten Teaser-Clips und Kurz-Videos (Reels/Shorts) für die Social-Media-Kanäle</span></li>
+                <li class="todo-item"><input type="checkbox" id="t28"><span class="todo-text">Finanzieller Jahresabschluss 2026: Alle Mittel für das Haushaltsjahr 2026 fristgerecht prüfen und verausgaben <span class="badge badge-budget">Achtung: Budgetverfall</span></span></li>
+            </ul>
+            <button class="add-btn" onclick="addCustomTask('list-m8')">➕ Neue Aufgabe hinzufügen</button>
+        </div>
+    </div>
+
+    <div class="year-section">
+        <div class="year-title">Haushaltsjahr 2027</div>
+
+        <div class="month-card" id="card-m9">
+            <div class="month-title">
+                <span>Januar 2027 (Monat 9) - Mittelabruf & Redaktionsstart</span>
+                <button class="print-month-btn" onclick="printMonth('card-m9')" title="Diesen Monat drucken">🖨️</button>
+            </div>
+            <ul class="todo-list" id="list-m9">
+                <li class="todo-item"><input type="checkbox" id="t29"><span class="todo-text">Mittelabruf der ersten Tranche für das Haushaltsjahr 2027 beim BMAS einreichen zur Sicherung der Liquidität</span></li>
+                <li class="todo-item"><input type="checkbox" id="t30"><span class="todo-text">Durchführung <b>Arbeitssitzung 2 (Unternehmen)</b>: Strategischer OE-Workshop und Nachbereitung der ersten Ergebnisse mit Partner 1</span></li>
+                <li class="todo-item"><input type="checkbox" id="t31"><span class="todo-text">Konzeptioneller und redaktioneller Aufbau der Handreichung (Checklisten, Muster-Betriebsvereinbarungen) durch das Projektteam</span></li>
+            </ul>
+            <button class="add-btn" onclick="addCustomTask('list-m9')">➕ Neue Aufgabe hinzufügen</button>
+        </div>
+
+        <div class="month-card" id="card-m10">
+            <div class="month-title">
+                <span>Februar 2027 (Monat 10) - Real-Labor 2</span>
+                <button class="print-month-btn" onclick="printMonth('card-m10')" title="Diesen Monat drucken">🖨️</button>
+            </div>
+            <ul class="todo-list" id="list-m10">
+                <li class="todo-item"><input type="checkbox" id="t32"><span class="todo-text">Durchführung <b>Arbeitssitzung 4 (Jugendliche)</b>: 3-tägige intensive Vorbereitung der 12 Jugendlichen auf das zweite Real-Labor</span></li>
+                <li class="todo-item"><input type="checkbox" id="t33"><span class="todo-text">Durchführung <b>Real-Labor 2</b>: 2-tägige moderierte Dialogveranstaltung im zweiten Partnerunternehmen (Öffentlicher Dienst) <span class="badge badge-milestone">Meilenstein</span></span></li>
+                <li class="todo-item"><input type="checkbox" id="t34"><span class="todo-text">Letzte qualitative Post-Interviews durch die Fachkraft für Videodokumentation mit Jugendlichen und Unternehmen abschließen</span></li>
+                <li class="todo-item"><input type="checkbox" id="t35"><span class="todo-text">Rohschnitt-Freigabe für die 5–8 themenspezifischen Video-Clips und Tutorials für die Transfermaterialien</span></li>
+            </ul>
+            <button class="add-btn" onclick="addCustomTask('list-m10')">➕ Neue Aufgabe hinzufügen</button>
+        </div>
+
+        <div class="month-card" id="card-m11">
+            <div class="month-title">
+                <span>März 2027 (Monat 11) - Transferkonzeption</span>
+                <button class="print-month-btn" onclick="printMonth('card-m11')" title="Diesen Monat drucken">🖨️</button>
+            </div>
+            <ul class="todo-list" id="list-m11">
+                <li class="todo-item"><input type="checkbox" id="t36"><span class="todo-text">Konzeption der Peer-Workshop-Module gemeinsam mit den 12 qualifizierten Jugendlichen für die Verbände</span></li>
+                <li class="todo-item"><input type="checkbox" id="t37"><span class="todo-text">Redaktionsschluss der Handreichung (PDF ggf. Print) & Übergabe aller Daten an die Grafik für Satz und Layout</span></li>
+                <li class="todo-item"><input type="checkbox" id="t38"><span class="todo-text">Angebote einholen für Streaming-Technik, Raummiete und Catering der großen hybriden Abschlussveranstaltung <span class="badge badge-logistik">Hybrides Event</span></span></li>
+            </ul>
+            <button class="add-btn" onclick="addCustomTask('list-m11')">➕ Neue Aufgabe hinzufügen</button>
+        </div>
+
+        <div class="month-card" id="card-m12">
+            <div class="month-title">
+                <span>April 2027 (Monat 12) - Peer-Workshops & Marketing</span>
+                <button class="print-month-btn" onclick="printMonth('card-m12')" title="Diesen Monat drucken">🖨️</button>
+            </div>
+            <ul class="todo-list" id="list-m12">
+                <li class="todo-item"><input type="checkbox" id="t39"><span class="todo-text">Selbstständige Umsetzung der 2–3 kompakten Peer-Workshops durch die Jugendlichen in ihren jeweiligen Verbänden vor Ort</span></li>
+                <li class="todo-item"><input type="checkbox" id="t40"><span class="todo-text">Start der bundesweiten Social-Media-Kampagne und kontinuierliche Ausspielung des Video-Contents (Ziel: > 100.000 Views)</span></li>
+                <li class="todo-item"><input type="checkbox" id="t41"><span class="todo-text">Einladungsmanagement und Versand des Programms für das hybride Transfer-Event an Fachöffentlichkeit und Kammern</span></li>
+            </ul>
+            <button class="add-btn" onclick="addCustomTask('list-m12')">➕ Neue Aufgabe hinzufügen</button>
+        </div>
+
+        <div class="month-card" id="card-m13">
+            <div class="month-title">
+                <span>Mai 2027 (Monat 13) - Produktionsfinale</span>
+                <button class="print-month-btn" onclick="printMonth('card-m13')" title="Diesen Monat drucken">🖨️</button>
+            </div>
+            <ul class="todo-list" id="list-m13">
+                <li class="todo-item"><input type="checkbox" id="t42"><span class="todo-text">Druckfreigabe (Gut zum Druck) der Handreichung (PDF-Bereitstellung online, ggf. Printmuster)</span></li>
+                <li class="todo-item"><input type="checkbox" id="t43"><span class="todo-text">Final Cut und Abnahme des Haupt-Transferfilms der kontinuierlichen Videodokumentation</span></li>
+                <li class="todo-item"><input type="checkbox" id="t44"><span class="todo-text">Verknüpfung von Print & Video: QR-Codes der Videos in das finale Layout der Handreichung einbetten</span></li>
+            </ul>
+            <button class="add-btn" onclick="addCustomTask('list-m13')">➕ Neue Aufgabe hinzufügen</button>
+        </div>
+
+        <div class="month-card" id="card-m14">
+            <div class="month-title">
+                <span>Juni 2027 (Monat 14) - Großes Finale & Abschluss</span>
+                <button class="print-month-btn" onclick="printMonth('card-m14')" title="Diesen Monat drucken">🖨️</button>
+            </div>
+            <ul class="todo-list" id="list-m14">
+                <li class="todo-item"><input type="checkbox" id="t45"><span class="todo-text"><b>Durchführung der Hybriden Abschlussveranstaltung</b>: Feierliche Filmpremiere, Vorstellung der Handreichung und direkter Austausch <span class="badge badge-milestone">PROJEKTFINALE</span></span></li>
+                <li class="todo-item"><input type="checkbox" id="t46"><span class="todo-text">Methoden- und Asset-Transfer (Ergebnisse & Video-Library) in das reguläre Beratungsportfolio der RAA Berlin</span></li>
+                <li class="todo-item"><input type="checkbox" id="t47"><span class="todo-text">Letzte Rechnungen (Honorare Jugendliche, Filmemacher, Reisekosten für Abschluss) vollständig begleichen und buchen</span></li>
+                <li class="todo-item"><input type="checkbox" id="t48"><span class="todo-text">Zahlenmäßigen Nachweis und Belegsammlung für den formalen BMAS-Verwendungsnachweis lückenlos vorbereiten</span></li>
+            </ul>
+            <button class="add-btn" onclick="addCustomTask('list-m14')">➕ Neue Aufgabe hinzufügen</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // =========================================================================
+    // TEIL 1: INTERAKTIVE LOGIK & OBERFLÄCHE
+    // =========================================================================
+
+    let db = null;
+
+    function updateItemUI(checkbox) {
+        const li = checkbox.closest('.todo-item');
+        if (checkbox.checked) li.classList.add('checked');
+        else li.classList.remove('checked');
+    }
+
+    function updateProgress() {
+        const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+        const total = checkboxes.length;
+        const checked = document.querySelectorAll('input[type="checkbox"]:checked').length;
+        const percentage = total > 0 ? Math.round((checked / total) * 100) : 0;
+        
+        document.getElementById('project-progress').style.width = percentage + '%';
+        document.getElementById('progress-text').innerText = `${percentage}% Erledigt (${checked} von ${total} Aufgaben für das Team)`;
+    }
+
+    // Erstellt Stift, Papierkorb und Dropdown-Menü
+    function injectInteractiveElements(li, id) {
+        // Dropdown für Zuständigkeit einfügen
+        if (!li.querySelector('.assign-select')) {
+            const select = document.createElement('select');
+            select.className = 'assign-select';
+            select.innerHTML = `
+                <option value="">👤 Zuständigkeit...</option>
+                <option value="PL">Projektleitung (PL)</option>
+                <option value="FR">Fachreferat (FR)</option>
+                <option value="As">Assistenz (As)</option>
+                <option value="VD">Videodoku (VD)</option>
+                <option value="TN">Jugendliche (TN)</option>
+            `;
+            li.appendChild(select);
+
+            select.addEventListener('change', async (e) => {
+                const isChecked = li.querySelector('input[type="checkbox"]').checked;
+                const taskText = li.querySelector('.todo-text').innerText;
+                if (db) {
+                    try {
+                        await db.from('dashboard_todos').upsert({ id: id, is_checked: isChecked, task_text: taskText, assigned_to: e.target.value, updated_at: new Date() });
+                    } catch (err) { console.error(err); }
+                }
+            });
+        }
+
+        const selectElem = li.querySelector('.assign-select');
+
+        // Editier-Button (Stift) einfügen
+        if (!li.querySelector('.edit-btn')) {
+            const editBtn = document.createElement('button');
+            editBtn.className = 'action-btn edit-btn';
+            editBtn.innerHTML = '✏️';
+            editBtn.title = 'Aufgabe bearbeiten';
+            li.insertBefore(editBtn, selectElem);
+
+            editBtn.addEventListener('click', async () => {
+                const textSpan = li.querySelector('.todo-text');
+                const currentText = textSpan.innerText;
+                const newText = prompt("Aufgabe bearbeiten:", currentText);
+                
+                if (newText !== null && newText.trim() !== "") {
+                    textSpan.innerText = newText.trim();
+                    if (db) {
+                        const isChecked = li.querySelector('input[type="checkbox"]').checked;
+                        const assignedTo = li.querySelector('.assign-select') ? li.querySelector('.assign-select').value : null;
+                        const payload = { id: id, task_text: newText.trim(), is_checked: isChecked, updated_at: new Date() };
+                        if (assignedTo !== null) payload.assigned_to = assignedTo;
+                        
+                        try { await db.from('dashboard_todos').upsert(payload); }
+                        catch (err) { console.error(err); }
+                    }
+                }
+            });
+        }
+
+        // Lösch-Button (Papierkorb) einfügen
+        if (!li.querySelector('.delete-btn')) {
+            const delBtn = document.createElement('button');
+            delBtn.className = 'action-btn delete-btn';
+            delBtn.innerHTML = '🗑️';
+            delBtn.title = 'Aufgabe für das gesamte Team löschen';
+            li.insertBefore(delBtn, selectElem);
+
+            delBtn.addEventListener('click', async () => {
+                if (confirm("Möchten Sie diese Aufgabe wirklich für alle löschen?")) {
+                    li.style.display = 'none'; // Sofort ausblenden
+                    if (db) {
+                        try {
+                            // Trick: Wir überschreiben den Text mit [DELETED], um auch feste HTML-Aufgaben bei allen zu löschen!
+                            await db.from('dashboard_todos').upsert({ id: id, task_text: '[DELETED]', is_checked: false, updated_at: new Date() });
+                        } catch (err) { console.error(err); }
+                    }
+                    setTimeout(updateProgress, 100);
+                }
+            });
+        }
+    }
+
+    function renderCustomTask(monthId, id, text, isChecked, assignedTo) {
+        if (text === '[DELETED]') return; // Gelöschte Aufgaben überspringen
+
+        const ul = document.getElementById(monthId);
+        if (!ul || document.getElementById(id)) return;
+        
+        const li = document.createElement('li');
+        li.className = 'todo-item' + (isChecked ? ' checked' : '');
+        li.innerHTML = `<input type="checkbox" id="${id}" ${isChecked ? 'checked' : ''}><span class="todo-text">${text}</span>`;
+        ul.appendChild(li);
+
+        injectInteractiveElements(li, id);
+        if (assignedTo) li.querySelector('.assign-select').value = assignedTo;
+
+        const cb = li.querySelector('input');
+        cb.addEventListener('change', async (e) => {
+            updateItemUI(e.target);
+            updateProgress();
+            if (db) {
+                const currentAssign = li.querySelector('.assign-select').value;
+                const taskText = li.querySelector('.todo-text').innerText;
+                try { await db.from('dashboard_todos').upsert({ id: id, task_text: taskText, is_checked: e.target.checked, assigned_to: currentAssign, updated_at: new Date() }); } 
+                catch (err) { console.error(err); }
+            }
+        });
+    }
+
+    window.addCustomTask = async function(monthId) {
+        const taskText = prompt("Welche Aufgabe möchten Sie hinzufügen?");
+        if (!taskText || taskText.trim() === "") return;
+        
+        const newId = 'custom_' + Date.now();
+        renderCustomTask(monthId, newId, taskText, false, "");
+        updateProgress();
+
+        if (db) {
+            try {
+                await db.from('dashboard_todos').insert({
+                    id: newId, is_checked: false, task_text: taskText, month_id: monthId, updated_at: new Date()
+                });
+            } catch (err) { console.error(err); }
+        }
+    };
+
+    function attachStaticListeners() {
+        document.querySelectorAll('.todo-list > .todo-item > input[type="checkbox"]').forEach(cb => {
+            const li = cb.closest('.todo-item');
+            injectInteractiveElements(li, cb.id);
+
+            if(cb.id.startsWith('t') && !cb.hasAttribute('data-active')) {
+                cb.setAttribute('data-active', 'true');
+                cb.addEventListener('change', async (e) => {
+                    updateItemUI(e.target);
+                    updateProgress();
+                    if (db) {
+                        const currentAssign = li.querySelector('.assign-select').value;
+                        const taskText = li.querySelector('.todo-text').innerText;
+                        try { await db.from('dashboard_todos').upsert({ id: cb.id, task_text: taskText, is_checked: e.target.checked, assigned_to: currentAssign, updated_at: new Date() }); } 
+                        catch(err) { console.error(err); }
+                    }
+                });
+            }
+        });
+    }
+
+    // VOLLSTÄNDIGE FUNKTION ZUM AUSBLENDEN
+    let hideCompleted = false;
+    window.toggleCompleted = function() {
+        hideCompleted = !hideCompleted;
+        const btn = document.getElementById('toggle-completed-btn');
+        if (hideCompleted) {
+            document.body.classList.add('hide-completed');
+            btn.innerHTML = "👁️ Erledigte Aufgaben einblenden";
+        } else {
+            document.body.classList.remove('hide-completed');
+            btn.innerHTML = "👁️ Erledigte Aufgaben ausblenden";
+        }
+    };
+
+    window.printMonth = function(cardId) {
+        document.querySelectorAll('.year-section').forEach(el => el.style.display = 'none');
+        document.querySelector('.progress-container').style.display = 'none';
+
+        const activeCard = document.getElementById(cardId);
+        const parentSection = activeCard.closest('.year-section');
+        parentSection.style.display = 'block';
+        parentSection.querySelectorAll('.month-card').forEach(card => {
+            if(card.id !== cardId) card.style.display = 'none';
+        });
+
+        window.print();
+
+        setTimeout(() => {
+            document.querySelectorAll('.year-section').forEach(el => el.style.display = '');
+            document.querySelector('.progress-container').style.display = '';
+            document.querySelectorAll('.month-card').forEach(el => el.style.display = '');
+        }, 500);
+    };
+
+    // =========================================================================
+    // TEIL 2: CLOUD-DATENBANK-VERBINDUNG (Supabase)
+    // =========================================================================
+    
+    // === ⚠️ HIER IHRE ECHTEN SUPABASE SCHLÜSSEL EINSETZEN ===
+    const SUPABASE_URL = "https://kwlrgiqvkjsdmeygbeoq.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt3bHJnaXF2a2pzZG1leWdiZW9xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxNzQzMTUsImV4cCI6MjA5NDc1MDMxNX0.0LQ_9jwK5RGJ1LfPM8hvsILj8cDsD6HiBP7U87gYvX0";
+
+    if (!SUPABASE_URL.startsWith('http')) {
+        document.getElementById('progress-text').innerHTML = "<span style='color: #e74c3c; font-weight: bold;'>⚠️ LOKALER MODUS: Bitte echte Supabase-Schlüssel einsetzen!</span>";
+        attachStaticListeners();
+        updateProgress();
+    } else {
+        try {
+            db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            
+            db.from('dashboard_todos').select('*').then(({ data, error }) => {
+                if (error) throw error;
+                data.forEach(todo => {
+                    // Wenn die Aufgabe als gelöscht markiert ist, blenden wir sie direkt aus
+                    if (todo.task_text === '[DELETED]') {
+                        const cb = document.getElementById(todo.id);
+                        if (cb) cb.closest('.todo-item').remove();
+                        return;
+                    }
+
+                    if (todo.id.startsWith('t')) {
+                        const cb = document.getElementById(todo.id);
+                        if (cb) {
+                            cb.checked = todo.is_checked;
+                            updateItemUI(cb);
+                            const li = cb.closest('.todo-item');
+                            if (li) {
+                                if (todo.task_text) li.querySelector('.todo-text').innerText = todo.task_text;
+                                if (todo.assigned_to) {
+                                    setTimeout(() => li.querySelector('.assign-select').value = todo.assigned_to, 50);
+                                }
+                            }
+                        }
+                    } else if (todo.task_text && todo.month_id) {
+                        renderCustomTask(todo.month_id, todo.id, todo.task_text, todo.is_checked, todo.assigned_to);
+                    }
+                });
+                attachStaticListeners();
+                updateProgress();
+            }).catch(err => {
+                console.error(err);
+                document.getElementById('progress-text').innerText = "Fehler bei der Datenbank-Verbindung!";
+                attachStaticListeners();
+                updateProgress();
+            });
+
+            db.channel('schema-db-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'dashboard_todos' }, payload => {
+                
+                // Falls ein Teammitglied etwas löscht
+                if (payload.new.task_text === '[DELETED]') {
+                    const cb = document.getElementById(payload.new.id);
+                    if (cb) cb.closest('.todo-item').remove();
+                    updateProgress();
+                    return;
+                }
+
+                if (payload.eventType === 'INSERT' && payload.new.task_text && !payload.new.id.startsWith('t')) {
+                    renderCustomTask(payload.new.month_id, payload.new.id, payload.new.task_text, payload.new.is_checked, payload.new.assigned_to);
+                } else if (payload.eventType === 'UPDATE') {
+                    const cb = document.getElementById(payload.new.id);
+                    if (cb) {
+                        cb.checked = payload.new.is_checked;
+                        updateItemUI(cb);
+                        const li = cb.closest('.todo-item');
+                        if (li) {
+                            if (payload.new.task_text) li.querySelector('.todo-text').innerText = payload.new.task_text;
+                            if (payload.new.assigned_to !== undefined) li.querySelector('.assign-select').value = payload.new.assigned_to || '';
+                        }
+                    }
+                }
+                updateProgress();
+            }).subscribe();
+
+        } catch (err) {
+            console.error(err);
+            attachStaticListeners();
+            updateProgress();
+        }
+    }
+</script>
+</body>
+</html>
